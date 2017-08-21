@@ -15,7 +15,7 @@ const int TEMP_PLATE = A0;
 const int TEMP_RING = A1;
 const int TEMP_AMB = A2;
 
-int state = RING;
+int state = 1;
 
 Fridge fridge(FRIDGE);
 Plate plate(PLATE, 125);
@@ -26,6 +26,8 @@ Button btnPDOWN(BTN_TEMP_PLATE_DOWN, 200);
 Button btnAUP(BTN_TEMP_AMB_UP, 200);
 Button btnADOWN(BTN_TEMP_AMB_DOWN, 200);
 
+WrapperButton buttonPlate(35, &btnPUP, &btnPDOWN);
+WrapperButton buttonAmb(20, &btnAUP, &btnADOWN);
 
 PCF8574_HD44780_I2C lcd(0x27,20,4);
 
@@ -61,11 +63,6 @@ void setup() {
 }
 
 void setOutput() {
-  pinMode(BTN_TEMP_PLATE_UP, OUTPUT);
-  pinMode(BTN_TEMP_PLATE_DOWN, OUTPUT);
-  pinMode(BTN_TEMP_AMB_UP, OUTPUT);
-  pinMode(BTN_TEMP_AMB_DOWN, OUTPUT);
-  pinMode(BTN_RESET, OUTPUT);
 
   fridge.turn(OFF);
   plate.set(0);
@@ -77,8 +74,33 @@ void loop() {
   Serial.print("Sto per testare l'interfaccia num: ");
   Serial.println(state);
   delay(1000);
-
+  long temp,tempCycle;
   
+  switch (state){
+      case 0:
+              temp = millis();
+              while(millis() - temp <= 10000){
+                Serial.print("Valore del wrapper: ");
+                Serial.print((btnPDOWN.getState()==Button::STATE::DOWN)?1:0);
+                Serial.print(" ,ho terminato la lettura in: ");
+                Serial.println( millis() - tempCycle);
+                 tempCycle= millis();
+              }
+              break;
+              
+      case 1://wrapper button amb4
+              temp = millis();
+              while(millis() - temp <= 10000){
+                Serial.print("Valore del wrapper: ");
+                Serial.print(buttonPlate.value);
+                Serial.print(" ora leggo il valore");
+                buttonPlate.checkChange();
+                Serial.print(" ,ho terminato la lettura in: ");
+                Serial.println( millis() - tempCycle);
+                 tempCycle= millis();
+              }
+          
+  }
  /* switch (state) {
      case RING:
       Serial.print("Testo il piatto riscaldante");
@@ -202,60 +224,6 @@ void loop() {
   }*/
 }
 
-void checkButton(int btn) {
-  Button::STATE statoBottone;
-
-  switch (btn) {
-    case BTN_TEMP_PLATE_UP:
-      statoBottone = btnPUP.getState();
-      break;
-    case BTN_TEMP_PLATE_DOWN:
-      statoBottone = btnPDOWN.getState();
-      break;
-    case BTN_TEMP_AMB_UP:
-      statoBottone = btnAUP.getState();
-      break;
-    case BTN_TEMP_AMB_DOWN:
-      statoBottone = btnADOWN.getState();
-      break;
-  }
-
-  Serial.print("lo stato del bottone è : ");
-  if(Button::STATE::DOWN==statoBottone)
-    Serial.println("Premuto");
-  else
-    Serial.println("non premuto");
-  Serial.println("Premi il bottone per eseguire il test");
-
-  delay(3500);
-
-  Button::STATE statoBottone2 = statoBottone;
-
-  while (statoBottone2 == statoBottone) {
-    Serial.print(".");
-    delay(500);
-    switch (btn) {
-      case BTN_TEMP_PLATE_UP:
-        statoBottone2 = btnPUP.getState();
-        break;
-      case BTN_TEMP_PLATE_DOWN:
-        statoBottone2 = btnPDOWN.getState();
-        break;
-      case BTN_TEMP_AMB_UP:
-        statoBottone2 = btnAUP.getState();
-        break;
-      case BTN_TEMP_AMB_DOWN:
-        statoBottone2 = btnADOWN.getState();
-        break;
-    }
-  }
-  Serial.println("");
-  Serial.print("Hai premuto il tasto e portato il livello a : ");
-  if(Button::STATE::DOWN==statoBottone)
-    Serial.println("Premuto");
-  else
-    Serial.println("non premuto");
-}
 
 void alert(int num) {
   char res = '\n' ;

@@ -28,22 +28,24 @@ class Button{
   _pin = pin;
   pinMode(_pin,INPUT_PULLUP);
   _interval = 0;
-  _lastRead=millis();
+  _lastRead=0;
  }
 
  Button::Button(int pin, int interval){
   _pin = pin;
   pinMode(_pin,INPUT_PULLUP);
   _interval = interval;
+  _lastRead=0;
  }
 
 Button::STATE  Button::getState(){
   if(_interval <= millis() - _lastRead){
     _lastRead = millis();
-    if( digitalRead(_pin) == LOW) //vuol dire che è premuto
-      return Button::STATE::DOWN;
+    if( digitalRead(_pin) == LOW){ //vuol dire che è premuto
+            return Button::STATE::DOWN;
+    }
   } 
-  else
-    return Button::STATE::UP;
+  return Button::STATE::UP;
+    //return digitalRead(_pin);
 }
 
