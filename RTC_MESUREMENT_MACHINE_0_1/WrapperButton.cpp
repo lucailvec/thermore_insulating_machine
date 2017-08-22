@@ -5,7 +5,7 @@
 #include "Button.h"
 #endif
 
-WrapperButton::WrapperButton(int initialValue, Button *increment, Button *decrement){
+WrapperButton::WrapperButton(double initialValue, Button *increment, Button *decrement){
   value = initialValue;
   _increment = increment;
   _decrement = decrement;

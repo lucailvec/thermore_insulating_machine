@@ -9,8 +9,8 @@ Fridge::Fridge(int pin){
   _onState = HIGH;
 }
 
-void Fridge::turn(State st){
-  if(st==ON)
+void Fridge::turn(STATE st){
+  if(st==Fridge::STATE::ON)
     digitalWrite(_numPin,(_onState)?HIGH:LOW);
   else
     digitalWrite(_numPin,(_onState)?LOW:HIGH);

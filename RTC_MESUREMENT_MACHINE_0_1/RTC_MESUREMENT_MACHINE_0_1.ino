@@ -40,6 +40,31 @@ TempSensor tAmb(TEMP_AMB, BCOEFF, 99900, 100000, 25);
 TempSensor tPlate(TEMP_PLATE, BCOEFF, 99800, 100000, 25);
 TempSensor tRing(TEMP_RING, BCOEFF, 297000, 100000, 25);
 
+
+//PID control
+//Define Variables we'll be connecting to
+double //Setpoint, è il valore del wrapper button
+tempPlate, //aggiornato tramite tPlate.getTemp();
+outputPlate; //
+
+//Specify the links and initial tuning parameters
+double KpPlate=2, KiPlate=5, KdPlate=0;
+
+AnalogPid platePid(& (buttonPlate.value), & outputPlate, &tempPlate, KpPlate, KiPlate);
+
+Fridge::STATE outputAmb;
+double tempAmb;
+
+double KpAmb=2, KiAmb=5, KdAmb=0;
+double threshold = 5.0;
+long interval = 5000;
+//(double *setpoint, Fridge::STATE * output,double *mesure,double kp,double ki,long interval, double threshold);
+DiscretePid fridgePid(& (buttonAmb.value),&outputAmb,&tempAmb ,KpAmb,KiAmb,interval,threshold);
+//Statistics control
+
+Measurable statics1();
+Measurable statics2();
+
 void callback(){
   Serial.println("ATTENZIONE");
   while(1){
@@ -64,7 +89,7 @@ void setup() {
 
 void setOutput() {
 
-  fridge.turn(OFF);
+  fridge.turn(Fridge::STATE::OFF);
   plate.set(0);
   ring.set(0);
 
@@ -88,7 +113,7 @@ void loop() {
               }
               break;
               
-      case 1://wrapper button amb4
+      case -1://wrapper button amb4
               temp = millis();
               while(millis() - temp <= 10000){
                 Serial.print("Valore del wrapper: ");
@@ -99,6 +124,19 @@ void loop() {
                 Serial.println( millis() - tempCycle);
                  tempCycle= millis();
               }
+              break;
+      case 1:temp = millis();
+              temp = millis();
+              while(millis() - temp <= 10000){
+                Serial.print("Valore del wrapper: ");
+                Serial.print(buttonAmb.value);
+                Serial.print(" ora leggo il valore");
+                buttonAmb.checkChange();
+                Serial.print(" ,ho terminato la lettura in: ");
+                Serial.println( millis() - tempCycle);
+                 tempCycle= millis();
+              }
+              break;
           
   }
  /* switch (state) {

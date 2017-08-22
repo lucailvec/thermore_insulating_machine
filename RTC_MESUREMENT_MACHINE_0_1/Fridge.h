@@ -5,14 +5,15 @@
 #define Fridge_H
 
 
-enum State { ON , OFF  };
+
 
 class Fridge
 {
 public: 
+  enum STATE { ON , OFF  };
   Fridge(int pin);
   //Fridge(int pin, bool _onState);
-  void turn(State st);
+  void turn(STATE st);
 private:
   int _numPin;
   bool _onState;
