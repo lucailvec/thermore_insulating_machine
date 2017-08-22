@@ -8,8 +8,8 @@ class Measurable{
           double sd();
           void reset();//double output; ce l'ho già all'esterno
           void newVal(double val);
+          int _numOfValue;
        private: double _sum;
-                unsigned int _numOfValue;
                 double _sumAt2;
                 
                // double _mean;

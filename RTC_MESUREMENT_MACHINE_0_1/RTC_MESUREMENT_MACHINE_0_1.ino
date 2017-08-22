@@ -48,14 +48,15 @@ long interval = 5000;
 DiscretePid fridgePid(& (buttonAmb.value),&outputAmb,&tAmb.value ,KpAmb,KiAmb,interval,threshold);
 //Statistics control
 
-Measurable statics1();
-Measurable statics2();
+Measurable statics1;
+Measurable statics2;
 
 //variabili del supervisor
 
 enum STATE { IDLE, HEATING, MESUREMENT };
 STATE stato;
-long intervalDisplay=3000,lastDisplay=0,displayTimer1=0,displayTimer2=0,_numMesurement=30;
+long intervalDisplay=3000,lastDisplay=0,displayTimer1=0,displayTimer2=0,_numMesurement=50;
+long timeOfLoop;
 
 void callback(){
   Serial.println("ATTENZIONE");
@@ -79,11 +80,13 @@ void setup() {
 }
 
 void loop() {
+  timeOfLoop=micros();
   /*supervisor.*/
   _run();//esegua le operazioni di modifica dello stato quale accensione o spegnimento degli elementi
   /*supervisor.*/
   _update();// aggiorna ed esegue calcoli sui valori aggiornati
   _display();//mostra a display i valori
+  Serial.println(micros() - timeOfLoop);
 }
 
 //var glob stato
@@ -140,7 +143,11 @@ void _update(){
       fridgePid.compute();
       fridge.turn(outputAmb);
       plate.set(outputPlate);
-
+      if(_numMesurement==statics1._numOfValue){
+        statics1.reset();
+        //statics2.reset();
+      }
+      statics1.newVal(outputAmb);
       
       break;
   }
