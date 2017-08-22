@@ -11,7 +11,7 @@ DiscretePid::DiscretePid(double * setpoint, Fridge::STATE * output,double * mesu
   _outputDiscrete = output;
   _threshold = threshold;
   _interval = interval;
-  pid = new PID( setpoint, &_output, mesure, kp, ki, 0., DIRECT);
+  pid = new PID( setpoint, &_output, mesure, kp, ki, 0., P_ON_M, DIRECT);
   pid->SetMode(AUTOMATIC);
 }
 

@@ -11,7 +11,8 @@ class TempSensor
 {
 public: 
   TempSensor(int numPin, int BCOEFFICIENT, int SERIESRESISTOR, int THERMISTORNOMINAL, float TEMPERATURENOMINAL);
-  float getTemp();
+  void checkChange();
+  double value;
   void setLimit(int minResistance, int maxResistance, void (*callback)());
   bool isResistanceConnected(int val);
 private:

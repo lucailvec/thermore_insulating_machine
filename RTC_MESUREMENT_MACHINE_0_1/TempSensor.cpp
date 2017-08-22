@@ -61,11 +61,11 @@ float TempSensor::_getTemp(){
   return steinhart;
 }
 
-float TempSensor::getTemp(){
+void TempSensor::checkChange(){
   _readNewValue();
   float average;
   for(int i = 0 ; i < 5 ; i++)
     average+=this->_ar[i];
-  return average/5;
+  this->value= (double)average/5;
 }
 
