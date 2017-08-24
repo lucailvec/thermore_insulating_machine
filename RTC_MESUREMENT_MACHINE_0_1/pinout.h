@@ -9,5 +9,5 @@ const int PLATE = 9;
 const int RING = 10;
 
 const int TEMP_PLATE = A0;
-const int TEMP_RING = A1;
-const int TEMP_AMB = A2;
+const int TEMP_RING = A2;
+const int TEMP_AMB = A1;

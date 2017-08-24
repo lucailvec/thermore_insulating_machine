@@ -5,8 +5,11 @@
 #include "Button.h"
 #endif
 
-WrapperButton::WrapperButton(double initialValue, Button *increment, Button *decrement){
+WrapperButton::WrapperButton(int initialValue, Button *increment, Button *decrement,int min,int max){
+  _min=min;
+  _max=max;
   value = initialValue;
+  dValue=value;
   _increment = increment;
   _decrement = decrement;
 }
@@ -19,5 +22,15 @@ void WrapperButton::checkChange(){
 
   if(_decrement->getState() == Button::STATE::DOWN)
     value--;
+
+  if(value>_max)
+    value=_max;
+
+  if(value<_min)
+    value = _min;
+
+  dValue=value;
 }
+
+
 

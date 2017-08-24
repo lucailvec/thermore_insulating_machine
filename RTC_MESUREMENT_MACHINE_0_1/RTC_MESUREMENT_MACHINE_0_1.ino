@@ -1,20 +1,20 @@
 #include "include.h"
 #include "pinout.h"
 
-
+#define DEBUG
 
 Fridge fridge(FRIDGE);
 Plate plate(PLATE, 125);
 Plate ring(RING, 125);
 
-Button btnPUP(BTN_TEMP_PLATE_UP, 200);
-Button btnPDOWN(BTN_TEMP_PLATE_DOWN, 200);
-Button btnAUP(BTN_TEMP_AMB_UP, 200);
-Button btnADOWN(BTN_TEMP_AMB_DOWN, 200);
-Button btnNEXT(BTN_NEXT, 200);
+Button btnPUP(BTN_TEMP_PLATE_UP, 500);
+Button btnPDOWN(BTN_TEMP_PLATE_DOWN, 500);
+Button btnAUP(BTN_TEMP_AMB_UP, 500);
+Button btnADOWN(BTN_TEMP_AMB_DOWN, 500);
+Button btnNEXT(BTN_NEXT, 500);
 
-WrapperButton buttonPlate(35, &btnPUP, &btnPDOWN);
-WrapperButton buttonAmb(20, &btnAUP, &btnADOWN);
+WrapperButton buttonPlate(35, &btnPUP, &btnPDOWN,minTempPlate,maxTempPlate);
+WrapperButton buttonAmb(20, &btnAUP, &btnADOWN,minTempAmb,maxTempAmb);
 
 PCF8574_HD44780_I2C lcd(0x27,20,4);
 
@@ -23,9 +23,9 @@ PCF8574_HD44780_I2C lcd(0x27,20,4);
 #define BCOEFF 3955
 
 // TempSensor(int numPin, int B, int R, int R0, float T0);
-TempSensor tAmb(TEMP_AMB, BCOEFF, 99900, 100000, 25);
+TempSensor tAmb(TEMP_AMB, BCOEFF, 297000, 100000, 25);
 TempSensor tPlate(TEMP_PLATE, BCOEFF, 99800, 100000, 25);
-TempSensor tRing(TEMP_RING, BCOEFF, 297000, 100000, 25);
+TempSensor tRing(TEMP_RING, BCOEFF, 99900, 100000, 25);
 
 
 //PID control
@@ -37,7 +37,7 @@ outputPlate; //
 //Specify the links and initial tuning parameters
 double KpPlate=2, KiPlate=5, KdPlate=0;
 
-AnalogPid platePid(& (buttonPlate.value), & outputPlate, &tPlate.value, KpPlate, KiPlate);
+AnalogPid platePid(& (buttonPlate.dValue), & outputPlate, &tPlate.value, KpPlate, KiPlate);
 
 Fridge::STATE outputAmb;
 
@@ -45,7 +45,7 @@ double KpAmb=2, KiAmb=5, KdAmb=0;
 double threshold = 5.0;
 long interval = 5000;
 //(double *setpoint, Fridge::STATE * output,double *mesure,double kp,double ki,long interval, double threshold);
-DiscretePid fridgePid(& (buttonAmb.value),&outputAmb,&tAmb.value ,KpAmb,KiAmb,interval,threshold);
+DiscretePid fridgePid(& (buttonAmb.dValue),&outputAmb,&tAmb.value ,KpAmb,KiAmb,interval,threshold);
 //Statistics control
 
 Measurable statics1;
@@ -55,19 +55,25 @@ Measurable statics2;
 
 enum STATE { IDLE, HEATING, MESUREMENT };
 STATE stato;
-long intervalDisplay=3000,lastDisplay=0,displayTimer1=0,displayTimer2=0,_numMesurement=50;
-long timeOfLoop;
+long intervalCallDisplay=1000,intervalDisplay=5000,lastDisplay=0,displayTimer1=0,displayTimer2=0,_numMesurement=50;
+long timeOfLoop;//,lastDisplay=0;;
 
 void callback(){
-  Serial.println("ATTENZIONE");
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print(F("ATTENZIONE, controllare sensori"));
+  Serial.println("ATTENZIONE errore, chiamata callback");
+  fridge.turn(Fridge::STATE::OFF);
+  plate.set(0);
+  ring.set(0);
   while(1){
-    Serial.println(".");
+    Serial.print(".");
   }
 }
 void setLimit(){
-  tAmb.setLimit(1,1024,callback);
-  tPlate.setLimit(1,1024,callback);
-  tRing.setLimit(1,1024,callback);
+  tAmb.setLimit(30,900,callback);
+  tPlate.setLimit(30,900,callback);
+  tRing.setLimit(30,900,callback);
   
 }
 void setup() {
@@ -76,17 +82,23 @@ void setup() {
   lcd.init();                        
   lcd.backlight();      
   lcd.clear();
-  Serial.begin(115200);
+  Serial.begin(2000000);
 }
 
 void loop() {
-  timeOfLoop=micros();
+  timeOfLoop=millis();
   /*supervisor.*/
   _run();//esegua le operazioni di modifica dello stato quale accensione o spegnimento degli elementi
   /*supervisor.*/
   _update();// aggiorna ed esegue calcoli sui valori aggiornati
-  _display();//mostra a display i valori
-  Serial.println(micros() - timeOfLoop);
+
+  if(millis()- lastDisplay >= intervalCallDisplay){
+    _display();//mostra a display i valori
+    lastDisplay=millis();
+  }
+  #ifdef DEBUG
+  Serial.println(millis() - timeOfLoop);
+  #endif
 }
 
 //var glob stato
@@ -120,6 +132,7 @@ void _update(){
         stato=STATE::HEATING;
         displayTimer1=0;
         displayTimer2=0;
+        lcd.clear();
       }
       
       break;
@@ -158,32 +171,34 @@ void _update(){
 //var glob stato
 void _display(){
   if(displayTimer1==0 && displayTimer2==0)
-   displayTimer2=millis()+intervalDisplay;
+   displayTimer2=millis();
   switch(stato){
     case STATE::IDLE:
         
       if(displayTimer1==0){//diplayTimer1 mostra a che fase è del singolo stato mentre displayTimer2 indica quale informazione stampare a video
          lcd.setCursor(0,0); //prima riga
          lcd.print(F("Stato: IDLE"));
-         lcd.setCursor(0,1); //prima riga
-         lcd.print(F("Premi il bottone NEXT"));
          lcd.setCursor(0,2); //prima riga
-         lcd.print(F("per sett. la temp"));
-         if(millis() - displayTimer2 >= intervalDisplay)
+         lcd.print(F("POI premi  NEXT"));
+         lcd.setCursor(0,1); //prima riga
+         lcd.print(F("Sett. la temp"));
+         if(millis() - displayTimer2 >= intervalDisplay){
             displayTimer1=1;
+            lcd.clear();
+         }
       }else{
         lcd.setCursor(0,0); //prima riga
         lcd.print(F("Ta: "));
         lcd.print(tAmb.value,1);
         lcd.setCursor(12,0);
         lcd.print(F("Tap:"));
-        lcd.print(buttonAmb.value,0);
+        lcd.print(buttonAmb.value);
         lcd.setCursor (0,1);//seconda riga 
         lcd.print(F("Tc:  "));
         lcd.print(tPlate.value,1);
         lcd.setCursor(12,1);
         lcd.print(F("Tcp:"));
-        lcd.print(buttonPlate.value,0);
+        lcd.print(buttonPlate.value);
      }
       
       break;
@@ -207,13 +222,13 @@ void _display(){
           lcd.print(tAmb.value,1);
           lcd.setCursor(12,0);
           lcd.print(F("Tap:"));
-          lcd.print(buttonAmb.value,0);
+          lcd.print(buttonAmb.value);
           lcd.setCursor (0,1);//seconda riga 
           lcd.print(F("Tc:  "));
           lcd.print(tPlate.value,1);
           lcd.setCursor(12,1);
           lcd.print(F("Tcp:"));
-          lcd.print(buttonPlate.value,0);
+          lcd.print(buttonPlate.value);
           if(millis() - displayTimer2 >= intervalDisplay){
             displayTimer1=2;
             displayTimer2=millis();
