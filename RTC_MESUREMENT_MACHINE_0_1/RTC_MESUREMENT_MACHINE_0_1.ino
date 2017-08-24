@@ -1,10 +1,10 @@
 #include "include.h"
 #include "pinout.h"
 
-#define DEBUG
+#define DEBUG 2
 
 Fridge fridge(FRIDGE);
-Plate plate(PLATE, 125);
+Plate plate(PLATE, 255);
 Plate ring(RING, 125);
 
 Button btnPUP(BTN_TEMP_PLATE_UP, 500);
@@ -29,34 +29,50 @@ TempSensor tRing(TEMP_RING, BCOEFF, 99900, 100000, 25);
 
 
 //PID control
+
 //Define Variables we'll be connecting to
 double //Setpoint, è il valore del wrapper button
 //tempPlate, //aggiornato tramite tPlate.getTemp();
 outputPlate; //
 
 //Specify the links and initial tuning parameters
-double KpPlate=2, KiPlate=5, KdPlate=0;
+double KpPlate=2, KiPlate=0.5;
 
-AnalogPid platePid(& (buttonPlate.dValue), & outputPlate, &tPlate.value, KpPlate, KiPlate);
+AnalogPid platePid(&tPlate.value, & outputPlate,& (buttonPlate.dValue) , KpPlate, KiPlate);
+/*
+double mesureP,setpointP;
+PID * platePid = new PID(&mesureP, & (outputPlate),& setpointP , KpPlate, KiPlate, 0.0 , DIRECT);
 
+double Setpoint=2, Input=1, Output;
+
+//Specify the links and initial tuning parameters
+double Kp=2, Ki=5, Kd=1;
+PID * myPid = new PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+*/
 Fridge::STATE outputAmb;
 
-double KpAmb=2, KiAmb=5, KdAmb=0;
+double KpAmb=1, KiAmb=0.5, KdAmb=0.01;
 double threshold = 5.0;
 long interval = 5000;
 //(double *setpoint, Fridge::STATE * output,double *mesure,double kp,double ki,long interval, double threshold);
-DiscretePid fridgePid(& (buttonAmb.dValue),&outputAmb,&tAmb.value ,KpAmb,KiAmb,interval,threshold);
+DiscretePid fridgePid(&tAmb.value,&outputAmb, & (buttonAmb.dValue),KpAmb,KiAmb,interval,threshold);
 //Statistics control
 
-Measurable statics1;
-Measurable statics2;
+double _ar1[40];
+double _ar2[40];
+Measurable statics1(200,_ar1,40);
+Measurable statics2(200,_ar2,40);
+long _numMesurement=40;
 
 //variabili del supervisor
 
 enum STATE { IDLE, HEATING, MESUREMENT };
 STATE stato;
-long intervalCallDisplay=1000,intervalDisplay=5000,lastDisplay=0,displayTimer1=0,displayTimer2=0,_numMesurement=50;
+long intervalCallDisplay=1000,intervalDisplay=5000,lastDisplay=0,displayTimer1=0,displayTimer2=0;
 long timeOfLoop;//,lastDisplay=0;;
+
+//pid piatto
+
 
 void callback(){
   lcd.clear();
@@ -83,6 +99,10 @@ void setup() {
   lcd.backlight();      
   lcd.clear();
   Serial.begin(2000000);
+
+
+  
+ // myPid->SetMode(AUTOMATIC);
 }
 
 void loop() {
@@ -121,6 +141,10 @@ void _run(){
 }
 
 void _update(){
+ /*Input= tPlate.value;
+  Setpoint=buttonPlate.value;
+*/
+  
   switch(stato){
     case STATE::IDLE:
       tAmb.checkChange();
@@ -140,9 +164,30 @@ void _update(){
       tAmb.checkChange();
       tPlate.checkChange();
       platePid.compute();
+      //myPid->Compute();
+      Serial.print(F("Compute analogPid with input of:: mesure: "));
+      Serial.print(tPlate.value);
+      Serial.print(" setpoint :");
+      Serial.print(buttonPlate.value);
+      Serial.print(" and give an output of: ");
+      Serial.println(outputPlate);
+      
       fridgePid.compute();
+
+      Serial.print(F("Compute discrete with input of:: mesure: "));
+      Serial.print(tAmb.value);
+      Serial.print(" setpoint :");
+      Serial.print(buttonAmb.dValue);
+      Serial.print(" and give an output of: ");
+      Serial.println(outputAmb);
+      
       fridge.turn(outputAmb);
       plate.set(outputPlate);
+
+      
+      statics1.newVal(outputPlate);
+      statics2.newVal(tPlate.value);
+
       if(false){//guardo se la deviazione standard rispetto alla media scende sotto il 10 % se non di meno
         stato=STATE::MESUREMENT;
         displayTimer1=0;
@@ -156,10 +201,6 @@ void _update(){
       fridgePid.compute();
       fridge.turn(outputAmb);
       plate.set(outputPlate);
-      if(_numMesurement==statics1._numOfValue){
-        statics1.reset();
-        //statics2.reset();
-      }
       statics1.newVal(outputAmb);
       
       break;
@@ -236,17 +277,17 @@ void _display(){
            }
         }else if (displayTimer1==2){
           lcd.setCursor(0,0); //prima riga
-          lcd.print(F("Ta: "));
-          lcd.print(tAmb.value,1);
-          lcd.setCursor(12,0);
-          lcd.print(F("Tap:"));
-          lcd.print(buttonAmb.value,0);
-          lcd.setCursor (0,1);//seconda riga 
-          lcd.print(F("Tc:  "));
-          lcd.print(tPlate.value,1);
-          lcd.setCursor(12,1);
-          lcd.print(F("Tcp:"));
-          lcd.print(buttonPlate.value,0);
+          lcd.print(F("Pmean: "));
+          lcd.print(statics1.median());
+          lcd.setCursor(0,1);
+          lcd.print(F("CV: "));
+          lcd.print(statics1.cv());
+          lcd.setCursor (0,2);//seconda riga 
+          lcd.print(F("Tmean:  "));
+          lcd.print(statics2.median());
+          lcd.setCursor(0,3);
+          lcd.print(F("Tsd:"));
+          lcd.print(statics2.cv());
           if(millis() - displayTimer2 >= intervalDisplay){
             displayTimer1=1;
             displayTimer2=millis();
@@ -259,201 +300,8 @@ void _display(){
       break;
   }
   
-  if(intervalDisplay<=millis()-lastDisplay){
-  
-    lastDisplay=millis();
-  }
+ 
 }
-  /*S
-   
-   erial.print("Sto per avviare l'interfaccia num: ");
-  Serial.println(state);
-  delay(1000);
-  long temp,tempCycle;
   
-  switch (state){
-      case 0:
-              temp = millis();
-              while(millis() - temp <= 10000){
-                Serial.print("Valore del wrapper: ");
-                Serial.print((btnPDOWN.getState()==Button::STATE::DOWN)?1:0);
-                Serial.print(" ,ho terminato la lettura in: ");
-                Serial.println( millis() - tempCycle);
-                 tempCycle= millis();
-              }
-              break;
-              
-      case -1://wrapper button amb4
-              temp = millis();
-              while(millis() - temp <= 10000){
-                Serial.print("Valore del wrapper: ");
-                Serial.print(buttonPlate.value);
-                Serial.print(" ora leggo il valore");
-                buttonPlate.checkChange();
-                Serial.print(" ,ho terminato la lettura in: ");
-                Serial.println( millis() - tempCycle);
-                 tempCycle= millis();
-              }
-              break;
-      case 1:temp = millis();
-              temp = millis();
-              while(millis() - temp <= 10000){
-                Serial.print("Valore del wrapper: ");
-                Serial.print(buttonAmb.value);
-                Serial.print(" ora leggo il valore");
-                buttonAmb.checkChange();
-                Serial.print(" ,ho terminato la lettura in: ");
-                Serial.println( millis() - tempCycle);
-                 tempCycle= millis();
-              }
-              break;
-          
-  }
- /* switch (state) {
-     case RING:
-      Serial.print("Testo il piatto riscaldante");
-      Serial.print(RING);
-      Serial.println("Controlla la temperatura, tieni le dita sul piatto e percepisci l'aumento di temp.... accendo l'anello");
-      ring.set(125);
-      for (int i = 0 ; i < 10 ; i++) {
-        Serial.print("La temperatura della sonda è: ");
-        Serial.println(tRing.getTemp());
-        delay(750);
-
-      }
-      ring.set(0);
-      Serial.println("La temperatura è cambiata ? 1 per affermativo 0 per alt");
-      alert(state);
-      state = PLATE;
-      break;
-    case PLATE:
-      Serial.print("Testo il piatto riscaldante");
-      Serial.print(PLATE);
-      Serial.println("Controlla la temperatura, tieni le dita sul piatto e percepisci l'aumento di temp.... accendo il piatto");
-      plate.set(125);
-      for (int i = 0 ; i < 10 ; i++) {
-        Serial.print("La temperatura della sonda è: ");
-        Serial.println(tPlate.getTemp());
-        delay(750);
-      }
-      plate.set(0);
-      Serial.println("La temperatura è cambiata ? 1 per affermativo 0 per alt");
-      alert(state);
-      state = FRIDGE;
-      break;
-    case FRIDGE:
-      Serial.println("frigo..");
-      for (int i = 0; i < 4; i++) {
-        fridge.turn(ON);
-        Serial.println("on");
-        delay(5000);
-        fridge.turn(OFF);
-        Serial.println("off");
-        delay(3000);
-      }
-      alert(state);
-      state = BTN_TEMP_PLATE_UP;
-      break;
-    case BTN_TEMP_PLATE_UP:
-      checkButton(BTN_TEMP_PLATE_UP);
-      state = BTN_TEMP_PLATE_DOWN;
-      break;
-    case BTN_TEMP_PLATE_DOWN:
-      checkButton(BTN_TEMP_PLATE_DOWN);
-      state = BTN_TEMP_AMB_UP;
-      break;
-    case BTN_TEMP_AMB_UP:
-      checkButton(BTN_TEMP_AMB_UP);
-      state = BTN_TEMP_AMB_DOWN;
-      break;
-    case BTN_TEMP_AMB_DOWN:
-      checkButton(BTN_TEMP_AMB_DOWN);
-      state = TEMP_AMB;
-      break;
-    case TEMP_AMB:
-      Serial.print("La temperatura della sonda collegata al pin ");
-      Serial.print(TEMP_AMB);
-      Serial.print(" è di : ");
-      Serial.println(tAmb.getTemp());
-      Serial.println("Controlla la temperatura, tieni le dita sul sensore e osserva lo stato");
-      for (int i = 0 ; i < 10 ; i++) {
-        Serial.print("La temperatura della sonda è: ");
-        Serial.println(tAmb.getTemp());
-      }
-      Serial.println("La temperatura è cambiata ? 1 per affermativo 0 per alt");
-      state = TEMP_PLATE;
-      break;
-
-    case TEMP_PLATE:
-      Serial.print("La temperatura della sonda collegata al pin ");
-      Serial.print(TEMP_PLATE);
-      Serial.print(" è di : ");
-      Serial.println(tPlate.getTemp());
-      Serial.println("Controlla la temperatura, tieni le dita sul sensore e osserva lo stato");
-      for (int i = 0 ; i < 10 ; i++) {
-        Serial.print("La temperatura della sonda è: ");
-        Serial.println(tPlate.getTemp());
-      }
-      Serial.println("La temperatura è cambiata ? 1 per affermativo 0 per alt");
-      state = TEMP_RING;
-      break;
-    case TEMP_RING:
-      Serial.print("La temperatura della sonda collegata al pin ");
-      Serial.print(TEMP_RING);
-      Serial.print(" è di : ");
-      Serial.println(tPlate.getTemp());
-      Serial.println("Controlla la temperatura, tieni le dita sul sensore e osserva lo stato");
-      for (int i = 0 ; i < 10 ; i++) {
-        Serial.print("La temperatura della sonda è: ");
-        Serial.println(tPlate.getTemp());
-        delay(750);
-      }
-      Serial.println("La temperatura è cambiata ? 1 per affermativo 0 per alt");
-      alert(state);
-      state = DISPLAY;
-      break;
-    case DISPLAY:
-      Serial.print("Sto per testare il display");
-       lcd.setCursor(0,0); //prima riga
-  lcd.print("Ta: ");
-   lcd.setCursor(12,0);
-  lcd.print("Tap:");
-  lcd.setCursor (0,1);//seconda riga 
-  lcd.print("Tc:  ");
-      Serial.println("il display ha mostrato delle scrittte ?  ? 1 per affermativo 0 per alt");
-      alert(state);
-      state = -1;
-      break;
-    default: 
-      Serial.println("TEST FINITO!");
-
-
-
-  }*/
-
-
-
-void alert(int num) {
-  char res = '\n' ;
-
-  while (1) {
-    Serial.print(".");
-    delay(200);
-    if (Serial.available() > 0) {
-
-      res = Serial.read();
-      if (res == '0' || res == '1' )
-        break;
-    }
-  }
-  if (res == '1')
-    return;
-  else {
-    while (1) {
-      Serial.print(F("Errore analizzando elemento: "));
-      Serial.println(num);
-    }
-  }
-}
 
 

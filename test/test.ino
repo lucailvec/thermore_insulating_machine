@@ -21,7 +21,7 @@ const int TEMP_AMB = A2;
 int state = RING;
 
 Fridge fridge(FRIDGE);
-Plate plate(PLATE, 125);
+Plate plate(PLATE, 255);
 Plate ring(RING, 125);
 
 Button btnPUP(BTN_TEMP_PLATE_UP, 200);
@@ -38,6 +38,11 @@ TempSensor tAmb(TEMP_AMB, BCOEFF, 99900, 100000, 25);
 TempSensor tPlate(TEMP_PLATE, BCOEFF, 99800, 100000, 25);
 TempSensor tRing(TEMP_RING, BCOEFF, 297000, 100000, 25);
 
+#include <PCF8574_HD44780_I2C.h>
+#define ONE_WIRE_BUS 17    
+
+
+PCF8574_HD44780_I2C lcd(0x27,20,4);
 void callback(){
   Serial.println("ATTENZIONE");
   while(1){
@@ -54,6 +59,9 @@ void setup() {
   setLimit();
   setOutput();
   Serial.begin(115200);
+   lcd.init();                        
+  lcd.backlight();      
+  lcd.clear();
 }
 
 void setOutput() {
@@ -94,8 +102,8 @@ void loop() {
       Serial.print("Testo il piatto riscaldante");
       Serial.print(PLATE);
       Serial.println("Controlla la temperatura, tieni le dita sul piatto e percepisci l'aumento di temp.... accendo il piatto");
-      plate.set(125);
-      for (int i = 0 ; i < 10 ; i++) {
+      plate.set(255);
+      for (int i = 0 ; i < 40 ; i++) {
         Serial.print("La temperatura della sonda è: ");
         Serial.println(tPlate.getTemp());
         delay(750);

@@ -7,17 +7,17 @@
 
 #include "Fridge.h"
 
-DiscretePid::DiscretePid(double * setpoint, Fridge::STATE * output,double * mesure,double kp,double ki,long interval, double threshold){
+DiscretePid::DiscretePid(double * mesure, Fridge::STATE * output,double * setpoint,double kp,double ki,long interval, double threshold){
   _outputDiscrete = output;
   _threshold = threshold;
   _interval = interval;
-  pid = new PID( setpoint, &_output, mesure, kp, ki, 0., P_ON_M, DIRECT);
+  pid = new PID( mesure, &_output, setpoint, kp, ki, 0., P_ON_M, REVERSE);
   pid->SetMode(AUTOMATIC);
 }
 
 void DiscretePid::compute(){
   pid->Compute();
-  if(millis() - _lastOn>=_interval && ( _output >= _threshold || _output <= - _threshold ) ) {//da controllare perchè non so come venga gestito il reverse
+  if(millis() - _lastOn>=_interval ) {//da controllare perchè non so come venga gestito il reverse
     *_outputDiscrete = ( _output >0) ?Fridge::STATE::ON : Fridge::STATE::OFF; //a causa del DIRECT
     _lastOn = millis();
   }

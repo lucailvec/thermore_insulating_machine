@@ -1,16 +1,19 @@
 
 #ifndef MEASURABLE_H
 #define MEASURABLE_H
-
+#include "QuickStats.h"
 class Measurable{
        public:
-          double mean();
-          double sd();
-          void reset();//double output; ce l'ho già all'esterno
+          Measurable(long interval,double * ar,int num);
+          double median();
+          double cv();
           void newVal(double val);
-          int _numOfValue;
-       private: double _sum;
-                double _sumAt2;
+          int NUMSAMPLES;
+       private: QuickStats * _stats;
+                long _interval;
+                long _lastRead;
+                double * _ar;
+                unsigned int _counter;
                 
                // double _mean;
                // double _sd;
@@ -19,3 +22,5 @@ class Measurable{
 };
 
 #endif
+
+

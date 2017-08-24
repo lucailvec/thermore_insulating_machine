@@ -8,7 +8,7 @@
 #endif
 
 class DiscretePid{
-  public: DiscretePid(double *setpoint, Fridge::STATE * output,double *mesure,double kp,double ki,long interval, double threshold);
+  public: DiscretePid( double *mesure, Fridge::STATE * output,double *setpoint,double kp,double ki,long interval, double threshold);
           PID * pid;
           void compute();
   private: Fridge::STATE * _outputDiscrete;

@@ -5,11 +5,12 @@
 #endif
 
 Fridge::Fridge(int pin){
+  _numPin=pin;
   pinMode(_numPin,OUTPUT);
   _onState = HIGH;
 }
 
-void Fridge::turn(STATE st){
+void Fridge::turn(Fridge::STATE st){
   if(st==Fridge::STATE::ON)
     digitalWrite(_numPin,(_onState)?HIGH:LOW);
   else

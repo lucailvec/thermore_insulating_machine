@@ -4,40 +4,41 @@
 #ifndef MATH_H
 #include <math.h>
 #endif
-/*          
- *        double mean();
-          double sd();
-          //double output; ce l'ho giàà all'esterno
-       private: double _sum;
-                double _sum^2;
-                unsigned int _numOfValue;
-                void _newVal(double val);
- */
+
+#ifndef ARDUINO_H
+#include <Arduino.h>
+#endif
 
 
-double Measurable::mean(){
-  return _sum/_numOfValue;
+  //float _ar[5];
+  //unsigned int _counter;
+
+#include "QuickStats.h"
+
+
+Measurable::Measurable(long interval,double * ar,int num){
+  _interval=interval;
+  _counter = 0;
+  _ar=ar;
+  NUMSAMPLES=num;
+  _stats = new QuickStats();
+}
+double Measurable::median(){
+  return _stats->median((float *)_ar,NUMSAMPLES);
   
 }
 
-double Measurable::sd(){
-  double meanAt2 = mean();//quadrato della media
-  meanAt2*=meanAt2;
-  //media dei quadrati
-
-  return (1.0/_numOfValue)*sqrt(_numOfValue*_sumAt2-meanAt2);
+double Measurable::cv(){
+  return _stats->CV((float *)_ar,NUMSAMPLES);
 }
 void Measurable::newVal(double val){
-  _numOfValue++;
-  _sum+=val;
-  _sumAt2 += val*val;
-  
+  if(_lastRead-millis()> _interval){
+    _ar[_counter]=val;
+    _counter++;
+    if(_counter==NUMSAMPLES)
+      _counter=0;
+    _lastRead=millis();
+  }
 }
 
-void Measurable::reset(){
-  _numOfValue=0;
-  _sum=0;
-  _sumAt2=0;
-
-}
 
