@@ -25,11 +25,15 @@ Measurable::Measurable(long interval,double * ar,int num){
 }
 double Measurable::median(){
   return _stats->median((float *)_ar,NUMSAMPLES);
-  
 }
-
+double Measurable::median(int num){
+  return _stats->median((float *)_ar,num);
+}
 double Measurable::cv(){
   return _stats->CV((float *)_ar,NUMSAMPLES);
+}
+double Measurable::cv(int num){
+  return _stats->CV((float *)_ar,num);
 }
 void Measurable::newVal(double val){
   if(_lastRead-millis()> _interval){

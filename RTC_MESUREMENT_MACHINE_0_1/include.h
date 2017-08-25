@@ -15,3 +15,5 @@
 #define maxTempPlate 50
 #define minTempAmb -20
 #define maxTempAmb 40
+
+#define RCT0 0.

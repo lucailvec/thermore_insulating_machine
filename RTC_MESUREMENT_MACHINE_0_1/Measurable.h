@@ -9,6 +9,8 @@ class Measurable{
           double cv();
           void newVal(double val);
           int NUMSAMPLES;
+          double median(int num);
+          double cv(int num);
        private: QuickStats * _stats;
                 long _interval;
                 long _lastRead;

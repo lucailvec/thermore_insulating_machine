@@ -15,7 +15,7 @@ AnalogPid::AnalogPid(double *mesure,double *output,double *setpoint,double kp,do
     Serial.print("mesure ");
     Serial.println(*mesure);
   #endif*/
-  pid = new PID(mesure , output,setpoint , kp, ki, 0.2, DIRECT);
+  pid = new PID(mesure , output,setpoint , kp, ki, 0.2, P_ON_M, DIRECT);
   pid->SetMode(AUTOMATIC);
   
 }

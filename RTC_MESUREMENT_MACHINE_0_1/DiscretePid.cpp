@@ -13,12 +13,13 @@ DiscretePid::DiscretePid(double * mesure, Fridge::STATE * output,double * setpoi
   _interval = interval;
   pid = new PID( mesure, &_output, setpoint, kp, ki, 0., P_ON_M, REVERSE);
   pid->SetMode(AUTOMATIC);
+  pid->SetOutputLimits(0,120);
 }
 
 void DiscretePid::compute(){
   pid->Compute();
   if(millis() - _lastOn>=_interval ) {//da controllare perchè non so come venga gestito il reverse
-    *_outputDiscrete = ( _output >0) ?Fridge::STATE::ON : Fridge::STATE::OFF; //a causa del DIRECT
+    *_outputDiscrete = ( _output >2) ?Fridge::STATE::ON : Fridge::STATE::OFF; //a causa del DIRECT
     _lastOn = millis();
   }
 }

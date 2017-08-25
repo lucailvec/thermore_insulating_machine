@@ -7,6 +7,7 @@ const int BTN_TEMP_AMB_DOWN = 6;
 const int BTN_NEXT = 7;
 const int PLATE = 9;
 const int RING = 10;
+const int FAN = 11;
 
 const int TEMP_PLATE = A0;
 const int TEMP_RING = A2;
