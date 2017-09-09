@@ -11,11 +11,14 @@ class DiscretePid{
   public: DiscretePid( double *mesure, Fridge::STATE * output,double *setpoint,double kp,double ki,long interval, double threshold);
           PID * pid;
           void compute();
+          double _output;
+           double _threshold;
+         // void changeSetPoint(double * newSetPoint);
   private: Fridge::STATE * _outputDiscrete;
-           double _output;
            long _interval;
            long _lastOn;
-           double _threshold;
+           double *_setpoint;
+           double *_mesure;
 };
 
 #endif

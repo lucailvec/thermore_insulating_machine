@@ -11,11 +11,13 @@ class Measurable{
           int NUMSAMPLES;
           double median(int num);
           double cv(int num);
+          void reset();
        private: QuickStats * _stats;
                 long _interval;
                 long _lastRead;
                 double * _ar;
                 unsigned int _counter;
+                void _newVal(double val);
                 
                // double _mean;
                // double _sd;

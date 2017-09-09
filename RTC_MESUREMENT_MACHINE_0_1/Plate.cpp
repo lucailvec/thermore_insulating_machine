@@ -15,6 +15,13 @@ void Plate::set(int pwm){
   else if (pwm<0)
     analogWrite(_numPin,0);
   else*/
+  if(Plate::STATE::OFF==_s)
     analogWrite(_numPin,pwm);
+  else
+    analogWrite(_numPin,0);
+}
+
+void Plate::turn(STATE s){
+  _s= s;
 }
 

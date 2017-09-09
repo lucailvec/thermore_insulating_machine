@@ -3,9 +3,11 @@
 
 #define DEBUG 2
 
+//piatto vuoto 18.5 gradi
+//2.32 minuti di prima oscillazione
 Fridge fridge(FRIDGE);
-Plate plate(PLATE, 200);
-Plate ring(RING, 125);
+Plate plate(PLATE, 255);
+Plate ring(RING, 180);
 
 Button btnPUP(BTN_TEMP_PLATE_UP, 500);
 Button btnPDOWN(BTN_TEMP_PLATE_DOWN, 500);
@@ -35,13 +37,13 @@ double //Setpoint, è il valore del wrapper button
 outputPlate; //
 
 //Specify the links and initial tuning parameters
-double KpPlate=2, KiPlate=0.01;
+double KpPlate=2, KiPlate=3, KdPlate=0.0;
 
-AnalogPid platePid(&tPlate.value, & outputPlate,& (buttonPlate.dValue) , KpPlate, KiPlate);
+AnalogPid platePid(&tPlate.value, & outputPlate,& (buttonPlate.dValue) , KpPlate, KiPlate,KdPlate);
 
 Fridge::STATE outputAmb;
 
-double KpAmb=1, KiAmb=0.75, KdAmb=0.03;
+double KpAmb=0.5, KiAmb=0.45;
 double threshold = 5.0;
 long interval = 20000;
 
@@ -56,32 +58,37 @@ double _ar2[40];
 Measurable statics2(500,_ar2,40);
 long _numMesurement=40;
 
-double _arRct[40];
-Measurable staticsRCT(1000,_arRct,40);
-int counterRCT=0;
+const int NUMOFRCTMESURE=75;
+double _arRct[NUMOFRCTMESURE];
+Measurable staticsRCT(0,_arRct,NUMOFRCTMESURE);
+int counterRCT=-40;
 
 
 //variabili del supervisor
 
 enum STATE { IDLE, COOLING, HEATING, MESUREMENT, END };
-STATE stato;
+STATE stato= STATE::IDLE;
+
 long intervalCallDisplay=1000,intervalDisplay=5000,lastDisplay=0,displayTimer1=0,displayTimer2=0;
 long timeOfLoop;//,lastDisplay=0;;
 
-bool stableState= false; unsigned int counterStableState=0;
+long lastTimeReadStableState=0, intervalReadStableState=3000; 
+unsigned int counterStableState=0;
+const unsigned int NUMBEROFSTABLESTATE = 40;
 
 void setup() {
-  setLimit();
+ setLimit();
   
   lcd.init();                        
   lcd.backlight();      
   lcd.clear();
+  #ifdef DEBUG
   Serial.begin(2000000);
-
+  #endif
   pinMode(FAN,OUTPUT);
-  digitalWrite(FAN,255);
-  delay(1000);
-  digitalWrite(FAN,30);
+  analogWrite(FAN,255);
+  delay(200);
+  analogWrite(FAN,50);
   
  // myPid->SetMode(AUTOMATIC);
 }
@@ -89,17 +96,47 @@ void setup() {
 void loop() {
   timeOfLoop=millis();
   /*supervisor.*/
-  _run();//esegua le operazioni di modifica dello stato quale accensione o spegnimento degli elementi
-  /*supervisor.*/
   _update();// aggiorna ed esegue calcoli sui valori aggiornati
-
+  /*supervisor.*/
+  _run();//esegua le operazioni di modifica dello stato quale accensione o spegnimento degli elementi
+  
   if(millis()- lastDisplay >= intervalCallDisplay){
     _display();//mostra a display i valori
     lastDisplay=millis();
+/*
+ lcd.setCursor(0,0);           lcd.print(F("Pmean: "));          lcd.print(statics1.median());
+          lcd.setCursor(11,0);          lcd.print(F("Pcv: "));          lcd.print(statics1.cv());
+          lcd.setCursor (0,1);          lcd.print(F("Tmean:  "));          lcd.print(statics2.median());
+          lcd.setCursor(11,1);          lcd.print(F("Tcv:"));          lcd.print(statics2.cv());
+ */
+    #ifdef DEBUG
+      Serial.print(F("OutAmb: "));
+      Serial.print(outputPlate);
+      Serial.print(F(" outPidAmb: "));
+      Serial.print(fridgePid._output);
+      Serial.print(F(" threshold: "));
+      Serial.print(fridgePid._threshold);
+      Serial.print(F(" | OutPlate: "));
+      Serial.print(outputPlate);/*
+      Serial.print(" outputMedian: ");
+      Serial.print(statics1.median());
+      Serial.print(" outputCv: ");
+      Serial.print(statics1.cv());*/
+      Serial.print(F(" dTime: "));
+      Serial.println(millis() - timeOfLoop);
+      Serial.print(F("TempPlate: "));
+      Serial.print(tPlate.value);
+      Serial.print(F(" SetPointPlate: "));
+      Serial.println(buttonPlate.value);
+      Serial.print(F("TempAmb: "));
+      Serial.print(tAmb.value);
+      Serial.print(F(" SetPointPlate: "));
+      Serial.println(buttonAmb.value);
+      Serial.print(F("Stato corrente: "));
+      Serial.println(stato);
+    #endif
   }
-  #ifdef DEBUG
-  Serial.println(millis() - timeOfLoop);
-  #endif
+
 }
 
 //var glob stato
@@ -107,18 +144,20 @@ void _run(){
   switch(stato){
     case STATE::IDLE:
       fridge.turn(Fridge::STATE::OFF);
+      plate.turn(Plate::STATE::OFF);
+      ring.turn(Plate::STATE::OFF);
       plate.set(0);
       ring.set(0);
       break;
     case STATE::COOLING:
       fridge.turn(outputAmb);
-      fan.set(255);
+      analogWrite(FAN,255);
       break;
     case STATE::HEATING:
-      fan.set(30);
+      plate.turn(Plate::STATE::OFF);
+      analogWrite(FAN,50);
       fridge.turn(outputAmb);
-      if(stableState)
-        plate.set(outputPlate);
+      plate.set(outputPlate);
       break;
     case STATE::MESUREMENT:
       fridge.turn(outputAmb);
@@ -141,23 +180,34 @@ void _update(){
       buttonAmb.checkChange();
       
       if(btnNEXT.getState()==Button::STATE::DOWN){
-        stato=STATE::HEATING;
+        stato=STATE::COOLING;
         displayTimer1=0;
         displayTimer2=0;
         lcd.clear();
+       
       }
       
       break;
      case STATE::COOLING:
+     
       tAmb.checkChange();
       tPlate.checkChange();
       fridgePid.compute();
+      /*#ifdef DEBUG
+        Serial.print("calculateCollingValue(buttonAmb.value) : ");
+        Serial.print(calculateCollingValue(buttonAmb.value));
+        Serial.print(" tAmb.value ");
+        Serial.println(tAmb.value);
+      #endif*/
+         //if(calculateCollingValue(buttonAmb.value)  >= tAmb.value ){
+         if(buttonAmb.value  + 0.5 >= tAmb.value ){
+          stato=STATE::HEATING;
+          displayTimer1=0;
+          displayTimer2=0;
+          break;
+        }
 
-    if(calculateCollingValue(buttonAmb.value)  >= tAmb.value ){//&& buttonPlate.value - 0.8 <= statics2.median() && buttonPlate.value + 0.8 >= statics2.median()){
-      stato=STATE::HEATING;
-      displayTimer1=0;
-      displayTimer2=0;
-    }
+
 
       break;
     case STATE::HEATING:
@@ -165,25 +215,33 @@ void _update(){
       tPlate.checkChange();
       platePid.compute();
       fridgePid.compute();
+      statics1.newVal(tAmb.value);
+      statics2.newVal(tPlate.value);
+ 
 
-  
-     if(buttonAmb.value - 0.4 <= statics1.median() && buttonAmb.value + 0.4 >= statics1.median() ){//&& buttonPlate.value - 0.8 <= statics2.median() && buttonPlate.value + 0.8 >= statics2.median()){
-
-      counterStableState++;
-      
-      if(counterStableState==3){
-        stableState=true;
-       
-      }else if(counterStableState==10){
-         if(buttonAmb.value - 0.4 <= statics1.median() && buttonAmb.value + 0.4 >= statics1.median() && buttonPlate.value - 0.8 <= statics2.median() && buttonPlate.value + 0.8 >= statics2.median()){
+     if(millis()-lastTimeReadStableState>= intervalReadStableState){
+    /*  #ifdef DEBUG
+        Serial.print("
+      #endif*/
+      if(buttonAmb.value - 1.8 <= statics1.median() && buttonAmb.value + 0.8 >= statics1.median() && buttonPlate.value - 0.8 <= statics2.median() && buttonPlate.value + 0.8 >= statics2.median()){
+        counterStableState++;
+      }
+       else{
+        counterStableState=0;
+       }
+        lastTimeReadStableState= millis();
+      }
+      //counter time is : NUMBEROFSTABLESTATE * itnervalReadStableState
+      if(counterStableState==NUMBEROFSTABLESTATE){
           stato=STATE::MESUREMENT;
           displayTimer1=0;
           displayTimer2=0;
-        }
+          lcd.clear();
+          //todo azzerare statics1 e 2
+          statics1.reset();
+          statics2.reset();
       }
-     }else{
-      counterStableState=0;
-     }
+
 
      break;
     //devo temporizzare le misure, leggo una misura ogni secondo ? -> definisco una costante chiamata intervallo measurament.
@@ -192,19 +250,45 @@ void _update(){
       tPlate.checkChange();
       platePid.compute();
       fridgePid.compute();
-      
+
       statics1.newVal(outputPlate);
       statics2.newVal(tPlate.value);
       
-      counterRCT++;
-      staticsRCT.newVal( normalize(convertToRCT(statics1.median(counterRCT))) ,statics2.median(),tAmb.value));
+
+     if(millis()-lastTimeReadStableState>= intervalReadStableState){
+      if(counterRCT<=-1){
+       counterRCT++;
+      }else{
+        double tempRCT = convertToRCT(statics1.median(counterRCT),statics2.median(),tAmb.value);
+        if(tempRCT<=0.010||tempRCT >= 10)
+          break;
+        counterRCT++;
+        staticsRCT.newVal( normalize(tempRCT));
+      }
       
+      lastTimeReadStableState=millis();
+     }
+
+     if(counterRCT>=NUMOFRCTMESURE){
+          stato=STATE::END;
+          displayTimer1=0;
+          displayTimer2=0;
+          lcd.clear();
+     }
       break;
 
     case STATE::END:
       tAmb.checkChange();
       tPlate.checkChange();
       fridgePid.compute();
+      plate.turn(Plate::STATE::OFF);
+      if(btnNEXT.getState()==Button::STATE::DOWN){
+        stato=STATE::IDLE;
+        displayTimer1=0;
+        displayTimer2=0;
+        lcd.clear();
+        counterRCT=-30;
+      }
       break;
   }
 }
@@ -246,8 +330,8 @@ void _display(){
       }else{
         lcd.setCursor(0,0);          lcd.print(F("Ta: "));          lcd.print(tAmb.value,1);
         lcd.setCursor(0,1);          lcd.print(F("Tap:"));          lcd.print(buttonAmb.dValue,1);
-        lcd.setCursor (0,2);         lcd.print(F("T da raggiungere:  "));  
-        lcd.setCursor(0,3); lcd.print(tPlate.value,1);
+        //lcd.setCursor (0,2);         lcd.print(F("T da raggiungere:  "));  
+        //lcd.setCursor(0,3); lcd.print(calculateCollingValue(buttonAmb.dValue),1);
       }
     break;
     case STATE::HEATING:
@@ -273,11 +357,11 @@ void _display(){
            }
         }else if (displayTimer1==2){
           lcd.setCursor(0,0);           lcd.print(F("Pmean: "));          lcd.print(statics1.median());
-          lcd.setCursor(11,0);          lcd.print(F("CV: "));          lcd.print(statics1.cv());
+          lcd.setCursor(11,0);          lcd.print(F("Pcv: "));          lcd.print(statics1.cv());
           lcd.setCursor (0,1);          lcd.print(F("Tmean:  "));          lcd.print(statics2.median());
-          lcd.setCursor(11,1);          lcd.print(F("Tsd:"));          lcd.print(statics2.cv());
+          lcd.setCursor(11,1);          lcd.print(F("Tcv:"));          lcd.print(statics2.cv());
           lcd.setCursor(0,2);          lcd.print(F("countSS:"));          lcd.print(counterStableState);
-          lcd.setCursor(0,3); lcd.print(F("p ON?: ")); lcd.print(stableState);
+          lcd.setCursor(0,3); lcd.print(F("Goal: ")); lcd.print(NUMBEROFSTABLESTATE);
           if(millis() - displayTimer2 >= intervalDisplay){
             displayTimer1=1;
             displayTimer2=millis();
@@ -291,10 +375,14 @@ void _display(){
         lcd.setCursor(12,0);        lcd.print(F("Tap:"));        lcd.print(buttonAmb.dValue,1);
         lcd.setCursor (0,1);        lcd.print(F("Tc:  "));        lcd.print(tPlate.value,1);
         lcd.setCursor(12,1);        lcd.print(F("Tcp:"));        lcd.print(buttonPlate.value);
-        double tempRCT= staticsRCT.median(counterRCT); 
-        lcd.setCursor(0,2);         lcd.print(F("RCT: "));        lcd.print(tempRCT,2);
-        lcd.setCursor(0,3);        lcd.print(F("CLO: "));        lcd.print(tempRCT*6.45,2);
-        lcd.setCursor(11,3); lcd.print(F("N°: ")); lcd.print(counterRCT);
+        if(counterRCT >= 0 ){
+          lcd.setCursor(0,2);         lcd.print(F("RCT: "));        lcd.print(staticsRCT.median(counterRCT),4);
+          lcd.setCursor(0,3);        lcd.print(F("CLO: "));        lcd.print(rct2Clo(staticsRCT.median(counterRCT)),4);
+        }else{
+          lcd.setCursor(0,2);         lcd.print(F("Campionamento "));
+          lcd.setCursor(0,3);         lcd.print(F("in corso "));
+        }
+        lcd.setCursor(11,3); lcd.print(F("N: ")); lcd.print(counterRCT);
       break;
 
     case STATE::END:
@@ -302,16 +390,16 @@ void _display(){
       if(displayTimer1==0){//diplayTimer1 mostra a che fase è del singolo stato mentre displayTimer2 indica quale informazione stampare a video
          lcd.setCursor(0,0);          lcd.print(F("Misura conclusa."));
          lcd.setCursor(0,1);          lcd.print(F("Premi NEXT per"));
-         lcd.setCursor(0,1);          lcd.print(F("riavviare la macchina"));
-         if(millis() - displayTimer2 >= intervalDisplay + 2000){
+         lcd.setCursor(0,2);          lcd.print(F("riavviare la macchina"));
+         if(millis() - displayTimer2 >= intervalDisplay + 10000){
             displayTimer1=1;
             lcd.clear();
          }
       }else{
         lcd.setCursor(0,0);        lcd.print(F("Ta: "));        lcd.print(tAmb.value,1);
         lcd.setCursor(12,0);        lcd.print(F("Tap:"));        lcd.print(buttonAmb.dValue,1);
-        lcd.setCursor (0,1);        lcd.print(F("RCT:  "));        lcd.print(staticsRCT.median(counterRCT),1);
-        lcd.setCursor(12,1);        lcd.print(F("Clo:"));        lcd.print(rct2Clo(buttonPlate.value)));
+        lcd.setCursor (0,1);        lcd.print(F("RCT:  "));        lcd.print(staticsRCT.median(counterRCT),3);
+        lcd.setCursor(0,2);        lcd.print(F("Clo:"));        lcd.print(rct2Clo(staticsRCT.median(counterRCT)));
      }
       break;
   }
@@ -339,8 +427,8 @@ void callback(){
   lcd.print(F("ATTENZIONE, controllare sensori"));
   Serial.println("ATTENZIONE errore, chiamata callback");
   fridge.turn(Fridge::STATE::OFF);
-  plate.set(0);
-  ring.set(0);
+  plate.turn(Plate::STATE::OFF);
+  ring.turn(Plate::STATE::OFF);
   while(1){
     Serial.print(".");
   }
@@ -363,6 +451,7 @@ void setLimit(){
 float rct2Clo(float val){
   return val * 6.45;
 }
+/*
 float calculateCollingValue(float val){
-  return 0.8333*val - 11.67;
-}
+  return 1.0714*val - 2.42857;
+}*/

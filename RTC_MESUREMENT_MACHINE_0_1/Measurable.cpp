@@ -37,12 +37,21 @@ double Measurable::cv(int num){
 }
 void Measurable::newVal(double val){
   if(_lastRead-millis()> _interval){
+    _newVal(val);
+    _lastRead=millis();
+  }
+}
+void Measurable::_newVal(double val){
     _ar[_counter]=val;
     _counter++;
     if(_counter==NUMSAMPLES)
       _counter=0;
-    _lastRead=millis();
-  }
+}
+void Measurable::reset(){
+  for(int i = 0 ; i < NUMSAMPLES; i ++)
+    _newVal(0.0);
+
+   _counter=0;
 }
 
 

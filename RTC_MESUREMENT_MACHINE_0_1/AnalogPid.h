@@ -9,7 +9,7 @@
 #endif
 
 class AnalogPid {
-  public: AnalogPid(double *setpoint,double *output,double *mesure,double kp,double ki);
+  public: AnalogPid(double *setpoint,double *output,double *mesure,double kp,double ki, double kd);
           PID * pid;//tramite l'esposizione del pid espongo tutto quello che mi serve
          void compute();
 };

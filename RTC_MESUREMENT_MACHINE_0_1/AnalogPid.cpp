@@ -6,7 +6,7 @@
 #endif
 
 
-AnalogPid::AnalogPid(double *mesure,double *output,double *setpoint,double kp,double ki){
+AnalogPid::AnalogPid(double *mesure,double *output,double *setpoint,double kp,double ki,double kd){
   /*#ifdef DEBUG
     Serial.print("Inizializzo analogPID con setpoint:");
     Serial.print(*setpoint);
@@ -15,8 +15,9 @@ AnalogPid::AnalogPid(double *mesure,double *output,double *setpoint,double kp,do
     Serial.print("mesure ");
     Serial.println(*mesure);
   #endif*/
-  pid = new PID(mesure , output,setpoint , kp, ki, 0.2, P_ON_M, DIRECT);
+  pid = new PID(mesure , output,setpoint , kp, ki, kd, P_ON_M, DIRECT);
   pid->SetMode(AUTOMATIC);
+  pid->SetOutputLimits(2, 60);
   
 }
 void AnalogPid::compute(){

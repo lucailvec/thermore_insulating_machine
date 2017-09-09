@@ -25,11 +25,14 @@ private:
   int _maxADC;
   void (*_callback)();
   void __noCallback(void);
-//Per gestire la media su 5 valori
+//Per gestire la media su 15 valori
   float _getTemp();
   void  _readNewValue();
-  float _ar[5];
+  float _ar[15];
   unsigned int _counter;
+
+  //una lettura ogni 200 ms
+  long lastRedValue;
 };
 
 #endif
