@@ -8,6 +8,8 @@
 #include "AnalogPid.h"
 #include "DiscretePid.h"
 
+#include "CONFIG.h"
+
 #include <PCF8574_HD44780_I2C.h>
 #define ONE_WIRE_BUS 17    
 

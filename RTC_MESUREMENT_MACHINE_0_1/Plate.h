@@ -12,7 +12,7 @@ public:
   enum STATE { ON, OFF };
   Plate(int pin, int maxPWM);
   void set(int pwm);
-  void Plate::turn(STATE s);
+  void turn(STATE s);
 private:
   STATE _s;
   int _numPin;

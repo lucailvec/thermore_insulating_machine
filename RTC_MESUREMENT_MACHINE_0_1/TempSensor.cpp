@@ -13,7 +13,7 @@ TempSensor::TempSensor(int numPin, int BCOEFFICIENT, int SERIESRESISTOR, int THE
   _minADC = 0;
   _maxADC = 1023;
 
-  for(int i = 0 ; i < 15 ;  i++)
+  for(int i = 0 ; i < 12 ;  i++)
     TempSensor::_readNewValue();
   
 }
@@ -21,7 +21,7 @@ TempSensor::TempSensor(int numPin, int BCOEFFICIENT, int SERIESRESISTOR, int THE
 void TempSensor::_readNewValue(){
   _ar[_counter]=_getTemp();
   _counter++;
-  if(_counter == 15)
+  if(_counter == 12)
     _counter = 0;
 }
 void TempSensor::setLimit(int minADC, int maxADC, void (*callback)()){
@@ -62,12 +62,12 @@ float TempSensor::_getTemp(){
 }
 
 void TempSensor::checkChange(){
-  if(millis() - lastRedValue >= 200){
+  if(millis() - lastRedValue >= 150){
     _readNewValue();
     float average;
-    for(int i = 0 ; i < 15 ; i++)
+    for(int i = 0 ; i < 12 ; i++)
       average+=this->_ar[i];
-    this->value= (double)average/15;
+    this->value= (double)average/12;
     lastRedValue = millis();
   }
 }

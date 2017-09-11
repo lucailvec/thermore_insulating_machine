@@ -28,7 +28,7 @@ private:
 //Per gestire la media su 15 valori
   float _getTemp();
   void  _readNewValue();
-  float _ar[15];
+  float _ar[12];
   unsigned int _counter;
 
   //una lettura ogni 200 ms

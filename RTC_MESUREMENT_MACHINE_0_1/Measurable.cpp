@@ -29,6 +29,12 @@ double Measurable::median(){
 double Measurable::median(int num){
   return _stats->median((float *)_ar,num);
 }
+double Measurable::average(){
+  return _stats->average((float *)_ar,NUMSAMPLES);
+}
+double Measurable::average(int num){
+  return _stats->average((float *)_ar,num);
+}
 double Measurable::cv(){
   return _stats->CV((float *)_ar,NUMSAMPLES);
 }

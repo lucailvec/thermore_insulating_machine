@@ -10,6 +10,8 @@ class Measurable{
           void newVal(double val);
           int NUMSAMPLES;
           double median(int num);
+          double Measurable::average();
+          double Measurable::average(int num);
           double cv(int num);
           void reset();
        private: QuickStats * _stats;

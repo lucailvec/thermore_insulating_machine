@@ -32,5 +32,10 @@ void WrapperButton::checkChange(){
   dValue=value;
 }
 
+void WrapperButton::set(int v){
+  value = v;
+  dValue=v;
+}
+
 
 

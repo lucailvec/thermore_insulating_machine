@@ -18,6 +18,7 @@ class WrapperButton{
           //oppure posso scegliere una funzione meno prona ad errori ma che mi consente di dividere la parte di aggiornamento del valore ad una di lettura
           double dValue;
           void checkChange();
+          void set(int v);
   private: Button * _increment;
            Button * _decrement; //devo andare a controllare lo stato dei componenti per poter aggiornare il valore
           int _min;
