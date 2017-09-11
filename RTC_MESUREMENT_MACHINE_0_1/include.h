@@ -8,8 +8,7 @@
 #include "AnalogPid.h"
 #include "DiscretePid.h"
 
-#include "CONFIG.h"
-
+#include <EEPROM.h>
 #include <PCF8574_HD44780_I2C.h>
 #define ONE_WIRE_BUS 17    
 
@@ -18,4 +17,4 @@
 #define minTempAmb -20
 #define maxTempAmb 40
 
-#define RCT0 0.
+double RCT0 = 0.;

@@ -26,7 +26,6 @@ PCF8574_HD44780_I2C lcd(0x27,20,4);
 
 TempSensor tAmb(TEMP_AMB, BCOEFF, 297000, 100000, 25);
 TempSensor tPlate(TEMP_PLATE, BCOEFF, 99800, 100000, 25);
-//TempSensor tRing(TEMP_RING, BCOEFF, 99900, 100000, 25);
 
 
 //PID control
@@ -66,7 +65,7 @@ int counterRCTCycle=0;
 
 //variabili del supervisor
 
-enum STATEMODE { NORMAL, RCTIDLE, RCTMESURE, RCTINSERT, RCTINSERT1, RCTINSERT2, RCTINSERT3, RCTINSERTEND };
+enum STATEMODE { NORMAL, RCTIDLE, MESURESETUP, MESURE, RCTINSERT, RCTINSERT1, RCTINSERT2, RCTINSERT3, RCTINSERTEND };
 STATEMODE stateMode = STATEMODE::NORMAL;
 int cifra;
 double tempRCT;
@@ -83,21 +82,32 @@ unsigned int counterStableState=0;
 const unsigned int NUMBEROFSTABLESTATE = 40;
 
 void setup() {
+  #ifdef DEBUG
+    Serial.begin(2000000);
+  #endif
+  #ifdef DEBUG
+    Serial.print("RCT0 20 C: "); buttonAmb.set(20); Serial.println(readRCT0());
+    Serial.print("RCT0 10 C: "); buttonAmb.set(10); Serial.println(readRCT0());
+    Serial.print("RCT0 0 C: "); buttonAmb.set(0); Serial.println(readRCT0());
+    Serial.print("RCT0 -10 C: "); buttonAmb.set(-10); Serial.println(readRCT0());
+    buttonAmb.set(20);
+  #endif
  setLimit();
   
   lcd.init();                        
   lcd.backlight();      
   lcd.clear();
-  #ifdef DEBUG
-  Serial.begin(2000000);
-  #endif
+
   pinMode(FAN,OUTPUT);
   analogWrite(FAN,255);
   delay(200);
   analogWrite(FAN,50);
 
+  for(int i = 0 ; i < 5 ; i++){
   if(btnPUP.getState()==Button::STATE::DOWN && btnPDOWN.getState()==Button::STATE::DOWN){
     stato = STATE::SELECTIONMODE;
+  }
+  delay(100);
   }
 }
 
@@ -141,7 +151,11 @@ void loop() {
       Serial.print(F(" SetPointPlate: "));
       Serial.println(buttonAmb.value);
       Serial.print(F("Stato corrente: "));
-      Serial.println(stato);
+      Serial.print(stato);
+      Serial.print(F(" StateMode: "));
+      Serial.print(stateMode);
+      Serial.print(F(" RCT0: "));
+      Serial.println(RCT0,3);
     #endif
   }
 
@@ -191,6 +205,7 @@ void _update(){
       buttonAmb.checkChange();
       
       if(btnNEXT.getState()==Button::STATE::DOWN){
+        RCT0 = readRCT0();// lo prende dalla eeprom
         stato=STATE::COOLING;
         displayTimer1=0;
         displayTimer2=0;
@@ -275,7 +290,10 @@ void _update(){
         /*if(tempRCT<=0.010||tempRCT >= 10)
           break;*/
         counterRCT++;
-        cycleRCT.newVal( normalize(tempRCT));
+        if(stateMode == STATEMODE::MESURE){
+         cycleRCT.newVal((tempRCT));
+        }else
+          cycleRCT.newVal( normalize(tempRCT));
       }
       
       lastTimeReadStableState=millis();
@@ -289,6 +307,11 @@ void _update(){
       tPlate.checkChange();
       fridgePid.compute();
       plate.turn(Plate::STATE::OFF);
+      
+      if(stateMode==STATEMODE::MESURE){
+        writeRCT0(totalRCT.average(counterRCT));
+      }
+      
       if(btnNEXT.getState()==Button::STATE::DOWN){
         stato=STATE::IDLE;
         displayTimer1=0;
@@ -299,57 +322,66 @@ void _update(){
       break;
 
     case STATE::SELECTIONMODE://inseriamo un rct er 20,10,0 e -10 
-      tAmb.checkChange();
-      tPlate.checkChange(); //NORMAL, RCTIDLE, RCTAMBTEMPSELECTION, RCTMESURE
-
-      //cambiare la modalità
-      if(btnPUP.getState() == Button::STATE::DOWN || btnPDOWN.getState() == Button::STATE::DOWN){
+      if(millis()-lastTimeReadStableState>= 500){
+        tAmb.checkChange();
+        tPlate.checkChange(); //NORMAL, RCTIDLE, RCTAMBTEMPSELECTION, RCTMESURE
+  
+        //cambiare la modalità
+        if(stateMode==STATEMODE::NORMAL || stateMode == STATEMODE::RCTIDLE || stateMode == STATEMODE::MESURESETUP)
+          if(btnPUP.getState() == Button::STATE::DOWN || btnPDOWN.getState() == Button::STATE::DOWN){
+            lcd.clear();
+            switch(stateMode){
+              case STATEMODE::NORMAL: stateMode = STATEMODE::RCTIDLE; break;
+              case STATEMODE::RCTIDLE: stateMode = STATEMODE::MESURESETUP; break;
+              case STATEMODE::MESURESETUP: stateMode = STATEMODE::NORMAL; break;
+            }
+          }
+  
         switch(stateMode){
-          case STATEMODE::NORMAL: stateMode = STATEMODE::RCTMESURE; break;
-          case STATEMODE::RCTIDLE: stateMode = STATEMODE::RCTINSERT; break;
-          case STATEMODE::RCTINSERT: stateMode = STATEMODE::NORMAL; break;
-        }
-      }
-      
-      if(stateMode==STATEMODE::RCTMESURE){
-         if(btnAUP.getState() == Button::STATE::DOWN || btnADOWN.getState() == Button::STATE::DOWN){
-            
-            if(buttonAmb.value -10 <= -20)
-               buttonAmb.set(20);
-            else
-               buttonAmb.set(buttonAmb.value -10);
-         }
-      }else if (stateMode==STATEMODE::RCTINSERT){
-        if(btnAUP.getState() == Button::STATE::DOWN || btnADOWN.getState() == Button::STATE::DOWN){
-            
-            if(buttonAmb.value -10 <= -20)
-               buttonAmb.set(20);
-            else
-               buttonAmb.set(buttonAmb.value -10);
-         }
-      }
-      else if(stateMode==STATEMODE::RCTINSERT1 || stateMode==STATEMODE::RCTINSERT2 || stateMode==STATEMODE::RCTINSERT3 ){
-        if(btnPUP.getState() == Button::STATE::DOWN){
-          cifra++;
-          }else if (btnPDOWN.getState() == Button::STATE::DOWN){
-           cifra--;
-        }  
-      }
-      
-      if(btnNEXT.getState()==Button::STATE::DOWN){
-        switch(stateMode){
-          case STATEMODE::NORMAL: stato = STATE::IDLE; break;
-          case STATEMODE::RCTIDLE: stateMode = STATEMODE::RCTINSERT; break;
-          case STATEMODE::RCTMESURE: stato= STATE::COOLING; break;
-          case STATEMODE::RCTINSERT: stateMode = STATEMODE::RCTINSERT;tempRCT= 0.; cifra=5; break;
-          case STATEMODE::RCTINSERT1: tempRCT += 0.1 * cifra; cifra = 5; stateMode = STATEMODE::RCTINSERT2; break;
-          case STATEMODE::RCTINSERT2: tempRCT += 0.01 * cifra; cifra = 5; stateMode = STATEMODE::RCTINSERT3; break;
-          case STATEMODE::RCTINSERT3: tempRCT += 0.001 * cifra; cifra = 5; stateMode = STATEMODE::RCTINSERTEND; break;
-          case STATEMODE::RCTINSERTEND: stato = STATEMODE::RCTINSERTEND; break;
-        }
-          displayTimer1=0;
-          displayTimer2=0;
-          lcd.clear();
+            case STATEMODE::MESURE: 
+              if(btnAUP.getState() == Button::STATE::DOWN || btnADOWN.getState() == Button::STATE::DOWN){
+              
+              if(buttonAmb.value -10 <= -20)
+                 buttonAmb.set(20);
+              else
+                 buttonAmb.set(buttonAmb.value -10);
+            }
+            break;
+           case STATEMODE::RCTINSERT:
+             if(btnAUP.getState() == Button::STATE::DOWN || btnADOWN.getState() == Button::STATE::DOWN){
+              if(buttonAmb.value -10 <= -20)
+                 buttonAmb.set(20);
+              else
+                 buttonAmb.set(buttonAmb.value -10);
+             }
+           break;
+           case STATEMODE::RCTINSERT1:
+           case STATEMODE::RCTINSERT2:
+           case STATEMODE::RCTINSERT3:
+                if(btnPUP.getState() == Button::STATE::DOWN)
+                  cifra++;
+                else if (btnPDOWN.getState() == Button::STATE::DOWN)
+                  cifra--;
+                break;
+          }
+        
+        if(btnNEXT.getState()==Button::STATE::DOWN){
+          switch(stateMode){
+            case STATEMODE::NORMAL: stato = STATE::IDLE; break;
+            case STATEMODE::RCTIDLE: stateMode = STATEMODE::RCTINSERT; break;
+            case STATEMODE::MESURESETUP: stateMode = STATEMODE::MESURE; break;
+            case STATEMODE::MESURE: stato= STATE::COOLING; break;
+            case STATEMODE::RCTINSERT: stateMode = STATEMODE::RCTINSERT1;tempRCT= 0.; cifra=5; break;
+            case STATEMODE::RCTINSERT1: tempRCT += 0.1 * cifra; cifra = 5; stateMode = STATEMODE::RCTINSERT2; break;
+            case STATEMODE::RCTINSERT2: tempRCT += 0.01 * cifra; cifra = 5; stateMode = STATEMODE::RCTINSERT3; break;
+            case STATEMODE::RCTINSERT3: tempRCT += 0.001 * cifra; cifra = 5; stateMode = STATEMODE::RCTINSERTEND; writeRCT0(tempRCT); break;
+            case STATEMODE::RCTINSERTEND: writeRCT0(tempRCT);
+          }
+            //displayTimer1=0;
+            displayTimer2=0;
+            lcd.clear();
+       }
+       lastTimeReadStableState=millis();
       }
   }
 }
@@ -362,7 +394,6 @@ void _display(){
    displayTimer2=millis();
   switch(stato){
     case STATE::IDLE:
-        
       if(displayTimer1==0){//diplayTimer1 mostra a che fase è del singolo stato mentre displayTimer2 indica quale informazione stampare a video
          lcd.setCursor(0,0);          lcd.print(F("Stato: IDLE"));
          lcd.setCursor(0,2);          lcd.print(F("POI premi  NEXT"));
@@ -481,23 +512,92 @@ void _display(){
             lcd.clear();
          }
       }else{
+        if(stateMode==STATEMODE::MESURE){
+          lcd.setCursor(0,0);        lcd.print(F("Rct0 calcolato: "));       
+          lcd.setCursor (0,1);        lcd.print(F("RCT0 medio:  "));        lcd.print(readRCT0(),3);
+          lcd.setCursor(0,2); lcd.print(F("Tamb: ")); lcd.print(buttonAmb.value);
+          lcd.setCursor(0,3); lcd.print(F("Riaccendi la macchina")); lcd.print(counterRCTCycle);
+         }else{
         lcd.setCursor(0,0);        lcd.print(F("Ta: "));        lcd.print(buttonAmb.value,1);     lcd.print(F(" Tp:"));        lcd.print(buttonPlate.dValue,1);
         lcd.setCursor (0,1);        lcd.print(F("RCT medio:  "));        lcd.print(totalRCT.average(counterRCTCycle),3);
         lcd.setCursor(0,2);        lcd.print(F("Clo medio:"));        lcd.print(rct2Clo(totalRCT.average(counterRCTCycle)),3);
         lcd.setCursor(0,3); lcd.print(F("Calc. su ")); lcd.print(counterRCTCycle);
+         }
      }
       break;
      case STATE::SELECTIONMODE:
-
+         if(displayTimer1==0){//diplayTimer1 mostra a che fase è del singolo stato mentre displayTimer2 indica quale informazione stampare a video
+         lcd.setCursor(0,0);          lcd.print(F("Stato: config"));
+         lcd.setCursor(0,1);        lcd.print(F("Usa btn PIATTO")); 
+         lcd.setCursor(0,2); lcd.print(F("cambiare la mod."));  
+         lcd.setCursor(0,3); lcd.print(F("Premi NEXT per entrare"));       
+          
+         if(millis() - displayTimer2 >= intervalDisplay + 7000){
+            displayTimer1=1;
+            displayTimer2=millis();
+            lcd.clear();
+         }
+      }else{
+        
+          
+         /* if(millis() - displayTimer2 >= intervalDisplay + 10000){
+              displayTimer1=1;
+              lcd.clear();
+           */   
+          switch(stateMode){
+            case STATEMODE::NORMAL: lcd.setCursor(0,0);          lcd.print(F("Mod: normale")); lcd.setCursor(0,1); lcd.print(F("Premi NEXT per")); lcd.setCursor(0,2); lcd.print(F("fare una misura")); break;
+          case STATEMODE::RCTIDLE: lcd.setCursor(0,0);          lcd.print(F("Mod: inserimento")); break;
+          case STATEMODE::MESURE:lcd.setCursor(0,0);          lcd.print(F("Con i btn Amb selez. la temp.")); 
+             lcd.setCursor(0,1);          lcd.print(F("Con NEXT procedi alla misura.")); break; 
+             lcd.setCursor(0,3);   lcd.print(F("TempAmb: ")); lcd.print(buttonAmb.dValue);
+          case STATEMODE::MESURESETUP: lcd.setCursor(0,0); lcd.print(F("Mod: misura")); lcd.setCursor(0,1); lcd.print(F("Misura, salva l'rct0")); break;
+         case STATEMODE::RCTINSERT: lcd.setCursor(0,0);   lcd.print(F("Inserisci la tAmb")); 
+          lcd.setCursor(0,1);   lcd.print(F("Usa btnAmb poi NEXT"));
+          lcd.setCursor(0,2);   lcd.print(F("TempAmb: ")); lcd.print(buttonAmb.dValue);
+          lcd.setCursor(0,3);   lcd.print(F("RCTO salv: ")); lcd.print(readRCT0());
+         break;
+         case STATEMODE::RCTINSERT1:
+         case STATEMODE::RCTINSERT2:
+         case STATEMODE::RCTINSERT3:
+             lcd.setCursor(0,0);   lcd.print(F("modif. la ")); lcd.print(stateMode- RCTINSERT); lcd.print(F(" cifra"));
+             lcd.setCursor(0,1); lcd.print(F("Unità: ")); lcd.print(cifra);
+             lcd.setCursor(0,2); lcd.print(F("RCT0: ")); lcd.print(tempRCT,3);
+             lcd.setCursor(0,3); lcd.print(F("Premi NEXT per conf."));
+            break;
+         case STATEMODE::RCTINSERTEND:
+             lcd.setCursor(0,0);   lcd.print(F("Scrittura")); 
+             lcd.setCursor(0,1); lcd.print(F("RCT0: ")); lcd.print(tempRCT);
+             lcd.setCursor(0,2); lcd.print(F("Per tAmb: ")); lcd.print(buttonAmb.dValue,1);
+             lcd.setCursor(0,3); lcd.print(F("Spegni e riaccendi."));
+        }
+     }
      break;
   }
 }
 
-
-double normalize(double val){
-  //return asd;
-  return val;
+int getIndexRCT0(){
+  return ((buttonAmb.value + 10)/10)*sizeof(double);
 }
+void writeRCT0(double val){
+  int t= getIndexRCT0();
+
+   #ifdef DEBUG
+     float f;
+      EEPROM.get(getIndexRCT0(),f);
+   Serial.print(F("EEPROM Scrivo:")); Serial.print(val); Serial.print(F(" in : ")); Serial.print(t); Serial.print(F(" al posto di:")); Serial.println((double)f);
+  #endif
+   EEPROM.put(t,(float)val);
+}
+
+double readRCT0(){
+  float f;
+  EEPROM.get(getIndexRCT0(),f);
+  #ifdef DEBUG
+  Serial.print(F("EEPROM Ho letto:")); Serial.print(f); Serial.print(F(" in : ")); Serial.println(getIndexRCT0());
+  #endif
+  return (double)f;
+}
+
 double convertToRCT(double dutyCyclePlate,double tempPlate,double tempAmb){
   //total area = 0.215*0.215 = 0,046225
   //double res= 1.5; //ohm 12V / 1.5 = 8A
@@ -537,7 +637,12 @@ void setLimit(){
 float rct2Clo(float val){
   return val * 6.45;
 }
-/*
-float calculateCollingValue(float val){
-  return 1.0714*val - 2.42857;
-}*/
+
+double normalize(double val){
+  //return asd; TODO usare getIndex per capire quale funzione di taratura usare
+  if(buttonAmb.value == 20 )
+      return 3.2257*val - 0.411613 ;  
+      
+  else
+      return val ;    
+}
