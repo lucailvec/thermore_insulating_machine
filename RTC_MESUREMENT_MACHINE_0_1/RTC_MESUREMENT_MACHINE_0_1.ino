@@ -256,6 +256,9 @@ void _update(){
     case STATE::MESUREMENT:
 
     if(btnNEXT.getState()==Button::STATE::DOWN){
+       if(stateMode==STATEMODE::MESURE){
+             writeRCT0(totalRCT.average(counterRCTCycle));
+          }
         stato=STATE::END;
         displayTimer1=0;
         displayTimer2=0;
@@ -271,12 +274,19 @@ void _update(){
 
       if(counterRCT>=NUMOFRCTMESURE){
           if(counterRCTCycle>=NUMMESUREMENT){
+            if(stateMode==STATEMODE::MESURE){
+             writeRCT0(totalRCT.average(counterRCTCycle));
+            }
             stato=STATE::END;
             displayTimer1=0;
             displayTimer2=0;
             lcd.clear();
           }else{
-            totalRCT.newVal(cycleRCT.median(counterRCT));
+            /*if(stateMode==STATEMODE::MESURE){
+              
+            }else{*/
+             totalRCT.newVal(cycleRCT.median(counterRCT));
+            
             counterRCT=0;
             counterRCTCycle++;
           }
@@ -308,11 +318,10 @@ void _update(){
       fridgePid.compute();
       plate.turn(Plate::STATE::OFF);
       
-      if(stateMode==STATEMODE::MESURE){
-        writeRCT0(totalRCT.average(counterRCT));
-      }
+  
       
       if(btnNEXT.getState()==Button::STATE::DOWN){
+          
         stato=STATE::IDLE;
         displayTimer1=0;
         displayTimer2=0;
@@ -514,9 +523,9 @@ void _display(){
       }else{
         if(stateMode==STATEMODE::MESURE){
           lcd.setCursor(0,0);        lcd.print(F("Rct0 calcolato: "));       
-          lcd.setCursor (0,1);        lcd.print(F("RCT0 medio:  "));        lcd.print(readRCT0(),3);
+          lcd.setCursor (0,1);        lcd.print(F("RCT0 medio: "));        lcd.print(readRCT0(),3);
           lcd.setCursor(0,2); lcd.print(F("Tamb: ")); lcd.print(buttonAmb.value);
-          lcd.setCursor(0,3); lcd.print(F("Riaccendi la macchina")); lcd.print(counterRCTCycle);
+          lcd.setCursor(0,3); lcd.print(F("Riaccendi la macchina")); 
          }else{
         lcd.setCursor(0,0);        lcd.print(F("Ta: "));        lcd.print(buttonAmb.value,1);     lcd.print(F(" Tp:"));        lcd.print(buttonPlate.dValue,1);
         lcd.setCursor (0,1);        lcd.print(F("RCT medio:  "));        lcd.print(totalRCT.average(counterRCTCycle),3);
@@ -530,7 +539,7 @@ void _display(){
          lcd.setCursor(0,0);          lcd.print(F("Stato: config"));
          lcd.setCursor(0,1);        lcd.print(F("Usa btn PIATTO")); 
          lcd.setCursor(0,2); lcd.print(F("cambiare la mod."));  
-         lcd.setCursor(0,3); lcd.print(F("Premi NEXT per entrare"));       
+         lcd.setCursor(0,3); lcd.print(F("Conferma con NEXT"));       
           
          if(millis() - displayTimer2 >= intervalDisplay + 7000){
             displayTimer1=1;
@@ -547,14 +556,17 @@ void _display(){
           switch(stateMode){
             case STATEMODE::NORMAL: lcd.setCursor(0,0);          lcd.print(F("Mod: normale")); lcd.setCursor(0,1); lcd.print(F("Premi NEXT per")); lcd.setCursor(0,2); lcd.print(F("fare una misura")); break;
           case STATEMODE::RCTIDLE: lcd.setCursor(0,0);          lcd.print(F("Mod: inserimento")); break;
-          case STATEMODE::MESURE:lcd.setCursor(0,0);          lcd.print(F("Con i btn Amb selez. la temp.")); 
-             lcd.setCursor(0,1);          lcd.print(F("Con NEXT procedi alla misura.")); break; 
-             lcd.setCursor(0,3);   lcd.print(F("TempAmb: ")); lcd.print(buttonAmb.dValue);
+          case STATEMODE::MESURE:lcd.setCursor(0,0);          lcd.print(F("Con Amb selez")); 
+              lcd.setCursor(0,1); lcd.print(F("la temp. poi NEXT")); 
+             lcd.setCursor(0,1);          lcd.print(F("Con NEXT procedi alla misura.")); 
+          lcd.setCursor(0,2);   lcd.print(F("TempAmb: ")); lcd.print(buttonAmb.dValue);
+          lcd.setCursor(0,3);   lcd.print(F("RCTO salv: ")); lcd.print(readRCT0(),3);
+          break;
           case STATEMODE::MESURESETUP: lcd.setCursor(0,0); lcd.print(F("Mod: misura")); lcd.setCursor(0,1); lcd.print(F("Misura, salva l'rct0")); break;
          case STATEMODE::RCTINSERT: lcd.setCursor(0,0);   lcd.print(F("Inserisci la tAmb")); 
           lcd.setCursor(0,1);   lcd.print(F("Usa btnAmb poi NEXT"));
           lcd.setCursor(0,2);   lcd.print(F("TempAmb: ")); lcd.print(buttonAmb.dValue);
-          lcd.setCursor(0,3);   lcd.print(F("RCTO salv: ")); lcd.print(readRCT0());
+          lcd.setCursor(0,3);   lcd.print(F("RCTO salv: ")); lcd.print(readRCT0(),3);
          break;
          case STATEMODE::RCTINSERT1:
          case STATEMODE::RCTINSERT2:
@@ -640,9 +652,9 @@ float rct2Clo(float val){
 
 double normalize(double val){
   //return asd; TODO usare getIndex per capire quale funzione di taratura usare
-  if(buttonAmb.value == 20 )
-      return 3.2257*val - 0.411613 ;  
+  //if(buttonAmb.value == 20 )
+      return 3.2257*val  - 0.14064 ;
       
-  else
-      return val ;    
+ // else
+ //     return val ;    
 }
