@@ -205,8 +205,11 @@ void _update(){
       buttonPlate.checkChange();
       buttonAmb.checkChange();
       
-      if(btnNEXT.getState()==Button::STATE::DOWN){
-        RCT0 = readRCT0();// lo prende dalla eeprom
+      if(btnNEXT.getState()==Button::STATE::DOWN){     
+        if(stateMode==STATEMODE::CLEAN || stateMode==STATEMODE::MEASURE)
+          RCT0 = 0;// lo prende dalla eeprom
+        else
+          RCT0 = readRCT0();
         stato=STATE::COOLING;
         displayTimer1=0;
         displayTimer2=0;
