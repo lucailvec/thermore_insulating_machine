@@ -1,6 +1,6 @@
 #include "include.h"
 #include "pinout.h"
-
+#include "setup.h"
 #define DEBUG 2
 
 //piatto vuoto 18.5 gradi
@@ -102,7 +102,7 @@ void setup() {
   pinMode(FAN,OUTPUT);
   analogWrite(FAN,255);
   delay(200);
-  analogWrite(FAN,27);
+  analogWrite(FAN,35);
 
   for(int i = 0 ; i < 5 ; i++){
   if(btnPUP.getState()==Button::STATE::DOWN && btnPDOWN.getState()==Button::STATE::DOWN){
@@ -177,7 +177,7 @@ void _run(){
       break;
     case STATE::HEATING:
      // plate.turn(Plate::STATE::ON);
-      analogWrite(FAN,27);
+      analogWrite(FAN,30);
       fridge.turn(outputAmb);
       plate.set(outputPlate);
       break;
@@ -425,6 +425,8 @@ void _display(){
      }
       if(stateMode == STATEMODE::CLEAN){
         lcd.setCursor(0,3); lcd.print(F("Bps rct0 e tarat."));
+      }else{
+        lcd.setCursor(0,3); lcd.print(F("Rct0: ")); lcd.print(readRCT0(),4);
       }
       
       break;
@@ -494,8 +496,14 @@ void _display(){
               lcd.setCursor(0,0);         lcd.print(F("RCTinst: "));        lcd.print(temp,4);
               lcd.setCursor(0,1);        lcd.print(F("CLOinst: "));        lcd.print(rct2Clo(temp),4);
               temp=totalRCT.average(counterRCTCycle);
+              if(counterRCTCycle>=1){
               lcd.setCursor(0,2);         lcd.print(F("RCTm: "));        lcd.print(temp,4);
               lcd.setCursor(0,3);        lcd.print(F("CLOm: "));        lcd.print(rct2Clo(temp),4);
+              }
+              else{
+                lcd.setCursor(0,2);         lcd.print(F("RCTm: wait")); 
+                lcd.setCursor(0,3);        lcd.print(F("CLOm: wait")); 
+              }
                if(millis() - displayTimer2 >= intervalDisplay){
                 displayTimer1=2;
                 displayTimer2=millis();
@@ -531,18 +539,18 @@ void _display(){
       }else{
         if(stateMode==STATEMODE::MEASURE){
           lcd.setCursor(0,0);        lcd.print(F("Rct0 calcolato: "));       
-          lcd.setCursor (0,1);        lcd.print(F("RCT0 medio: "));        lcd.print(readRCT0(),3);
+          lcd.setCursor (0,1);        lcd.print(F("RCT0 medio: "));        lcd.print(readRCT0(),4);
           lcd.setCursor(0,2); lcd.print(F("Tamb: ")); lcd.print(buttonAmb.value);
           lcd.setCursor(0,3); lcd.print(F("Riaccendi la macchina")); 
          }else if (stateMode== STATEMODE::CLEAN){
           lcd.setCursor(0,0);        lcd.print(F("Rct senza taratura"));       
-          lcd.setCursor (0,1);        lcd.print(F("RCT medio: "));       lcd.print(totalRCT.average(counterRCTCycle),3);
+          lcd.setCursor (0,1);        lcd.print(F("RCT medio: "));       lcd.print(totalRCT.average(counterRCTCycle),4);
           lcd.setCursor(0,2); lcd.print(F("Tamb: ")); lcd.print(buttonAmb.value);
           lcd.setCursor(0,3); lcd.print(F("Riaccendi la macchina")); 
          } else{
         lcd.setCursor(0,0);        lcd.print(F("Ta: "));        lcd.print(buttonAmb.value,1);     lcd.print(F(" Tp:"));        lcd.print(buttonPlate.dValue,1);
-        lcd.setCursor (0,1);        lcd.print(F("RCT medio:  "));        lcd.print(totalRCT.average(counterRCTCycle),3);
-        lcd.setCursor(0,2);        lcd.print(F("Clo medio:"));        lcd.print(rct2Clo(totalRCT.average(counterRCTCycle)),3);
+        lcd.setCursor (0,1);        lcd.print(F("RCT medio:  "));        lcd.print(totalRCT.average(counterRCTCycle),4);
+        lcd.setCursor(0,2);        lcd.print(F("Clo medio:"));        lcd.print(rct2Clo(totalRCT.average(counterRCTCycle)),4);
         lcd.setCursor(0,3); lcd.print(F("Calc. su ")); lcd.print(counterRCTCycle);
          }
      }
@@ -665,10 +673,5 @@ float rct2Clo(float val){
 }
 
 double normalize(double val){
-  //return asd; TODO usare getIndex per capire quale funzione di taratura usare
-  //if(buttonAmb.value == 20 )
-      return 3.2257*val  - 0.14064 ;
-      
- // else
- //     return val ;    
+      return alpha*val  + beta ;
 }
